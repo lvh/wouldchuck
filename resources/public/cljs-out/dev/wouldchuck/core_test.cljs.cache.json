@@ -1,0 +1,1 @@
+["^ ","~:rename-macros",["^ "],"~:renames",["^ "],"~:use-macros",["^ "],"~:excludes",["~#set",[]],"~:name","~$wouldchuck.core-test","~:imports",null,"~:requires",["^ ","~$t","~$cljs.test","^9","^9"],"~:cljs.spec/speced-vars",[],"~:uses",null,"~:defs",["^ "],"~:cljs.spec/registry-ref",[],"~:require-macros",["^ ","~$t","^9","^9","^9"],"~:doc",null]
