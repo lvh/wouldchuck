@@ -73,6 +73,7 @@
         make-tile (fn [root variant base-color]
                     [:symbol
                      {:id (str "tile-" root variant)
+                      :class "tile-root"
                       :transform (let [hw (/ tile-width 2)
                                        hh (/ tile-height 2)
                                        center (str "translate(-" hw ", -" hh ")")]
