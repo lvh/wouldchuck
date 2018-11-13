@@ -166,7 +166,7 @@
            {:id "generator-row"}
            (map-indexed
             (fn [i [tile variant]]
-              [:use {:x i :href (str "#tile-" tile variant)}])
+              ^{:key i} [:use {:x i :href (str "#tile-" tile variant)}])
             tiles)]]
          [:use {:href "#generator-row"}]]])
 
