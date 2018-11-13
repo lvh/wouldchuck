@@ -65,6 +65,16 @@
 (def tile-width 1)
 (def gutter-width 0.5)
 
+(def highlight-filter
+  [:filter#highlight
+   [:feColorMatrix {:type "matrix"
+                    :values (->> [[0 0 0 0 0]
+                                  [0 1 0 0 0]
+                                  [0 0 1 0 0]
+                                  [0 0 0 1 0]]
+                                 (flatten)
+                                 (str/join " "))}]])
+
 (defn canvas
   []
   (let [state @app-state
