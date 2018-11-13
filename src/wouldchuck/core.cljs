@@ -123,6 +123,8 @@
 
       ;; Can't use clipPath inside the symbol definition, mysteriously breaks.
       [:defs
+       highlight-filter
+
        [make-tile "sample" "0" "#000"]
        [:clipPath {:id "tile-base-clip"}
         [:use {:href "#tile-base-sample0"}]]
