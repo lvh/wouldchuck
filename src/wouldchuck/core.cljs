@@ -175,8 +175,9 @@
              (str root variant)]]))
        (for [root ["a" "b"] variant ["0" "1" "2" "3"]] [root variant]))]
 
-     (let [viewbox-width 15
-           viewbox-height tile-height
+     (let [cols (state :layout/cols)
+           viewbox-width (* cols tile-width)
+           viewbox-height (* 5 tile-height)  ;; generator row + 4 variants
            zoom-ratio 35
 
            cols (state :layout/cols)
