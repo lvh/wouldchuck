@@ -23,14 +23,17 @@
 (defn darken
   [hex-color]
   (-> hex-color gcolor/hexToRgb (gcolor/darken 0.20) gcolor/rgbArrayToHex))
+(def sqrt2 (Math/sqrt 2))
+(def sqrt3 (Math/sqrt 3))
+(def sqrt5 (Math/sqrt 5))
 
 (def editable-keys
   {:tile/ratio {::label "Ratio (height/width):"
                 ::presets {"1" 1
-                           "√2" (Math/sqrt 2)
-                           "√3" (Math/sqrt 3)
+                           "√2" sqrt2
+                           "√3" sqrt3
                            "2 (√4)" 2
-                           "√5" (Math/sqrt 5)}
+                           "√5" sqrt5}
                 ::coerce js/parseFloat}
    :tile/angle {::label "Angle (deg):"
                 ::presets {"30°" 30
@@ -61,6 +64,22 @@
            [:span {:class "presets"}
             (for [[preset v] presets]
               [:button {:on-click #(swap! app-state assoc k v)} preset])]))])]))
+
+(def full-presets
+  [{:name "Hexagons"
+    :values {:rule/string "abba,0033,03"
+             :layout/cols 18
+             :layout/rows 8
+             :tile/angle 30
+             :tile/ratio sqrt2}}])
+
+(defn ^:private full-presets-form
+  []
+  [:div
+   [:span "Example presets: "]
+   (for [{:keys [name values]} full-presets]
+     ^{:key name}
+     [:button {:on-click #(swap! app-state merge values)} name])])
 
 (def tile-width 1)
 (def gutter-width 0.5)
@@ -197,7 +216,10 @@
   []
   [:div
    [:img {:src "/img/woodchuck.svg" :style {:float :right}}]
+
    [parameter-form]
+   [full-presets-form]
+
    [rule-splainer]
    [canvas]])
 
