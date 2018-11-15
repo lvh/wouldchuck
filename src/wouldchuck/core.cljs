@@ -221,9 +221,24 @@
 
      [:section
       [:h2 "Entire board"]
-      [:svg
-       {:width "500px" :height "600px" :view-box "0 0 20 20"}
-       [:use {:href "#generator-row"}]]]]))
+      (let [{:keys [layout/cols layout/rows]} state
+            viewbox-width (* cols tile-width)
+            viewbox-height (* rows tile-height)
+            zoom-ratio 35]
+        [:svg
+         {:width (str (* zoom-ratio viewbox-width) "px")
+          :height (str (* zoom-ratio viewbox-height) "px")
+          :view-box (str/join " " [0 0 viewbox-width viewbox-height])
+          :style {:display "block"}}
+         (let [[_ _ v-rule] (-> state :rule/string (str/split ","))
+               row-variants (->> (cycle v-rule) (take rows))]
+           (map-indexed
+            (fn [i row-variant]
+              ^{:key i}
+              [:use
+               {:href (str "#row-" row-variant)
+                :y (* i tile-height)}])
+            row-variants))])]]))
 
 (defn rule-splainer
   []
