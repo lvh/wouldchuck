@@ -25,8 +25,11 @@
 (def colors [hickory walnut])
 (def adjacent (zipmap colors (rest (cycle colors))))
 (defn darken
-  [hex-color]
-  (-> hex-color gcolor/hexToRgb (gcolor/darken 0.20) gcolor/rgbArrayToHex))
+  ([hex-color amount]
+   (-> hex-color gcolor/hexToRgb (gcolor/darken amount) gcolor/rgbArrayToHex))
+  ([hex-color]
+   (darken hex-color 0.25)))
+
 (def sqrt2 (Math/sqrt 2))
 (def sqrt3 (Math/sqrt 3))
 (def sqrt5 (Math/sqrt 5))
