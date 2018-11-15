@@ -135,8 +135,12 @@
     [:div
      [:h2 "Base tiles and variants"]
      [:svg
-      (let [viewbox-width 15
-            viewbox-height (+ tile-height 1) ;; tile + room for the labels
+      (let [n-tiles (* (count roots) (count variants))
+            viewbox-width (+ (* tile-width n-tiles)
+                             (* gutter-width (dec n-tiles)))
+
+            label-height 1
+            viewbox-height (+ tile-height label-height)
             zoom-ratio 35]
         {:id "sample"
          :width (str (* zoom-ratio viewbox-width) "px")
