@@ -18,6 +18,10 @@
 
 (def hickory "#FFF8DC")
 (def walnut "#8B4513")
+
+(def variants (range 4))
+(def roots ["a" "b"])
+
 (def colors [hickory walnut])
 (def adjacent (zipmap colors (rest (cycle colors))))
 (defn darken
