@@ -180,25 +180,37 @@
            viewbox-height (* 5 tile-height)  ;; generator row + 4 variants
            zoom-ratio 35
 
-           cols (state :layout/cols)
            [root h-rule] (-> state :rule/string (str/split ","))
-           tiles (->> (map vector (cycle root) (cycle h-rule)) (take cols))]
+           tiles (->> (map vector (cycle root) (cycle h-rule)) (take cols))
+
+           row-transform (partial transform (* cols tile-width) tile-height)]
        [:section
-        [:h2 "Generator row"]
+        [:h2 "Row variants"]
         [:svg
-         {:id "generator-row-demo"
+         {:id "row-demo"
           :width (str (* zoom-ratio viewbox-width) "px")
           :height (str (* zoom-ratio viewbox-height) "px")
           :view-box (str/join " " [0 0 viewbox-width viewbox-height])
           :style {:display "block"}}
+
          [:defs
           [:symbol
            {:id "generator-row"}
-           (map-indexed
-            (fn [i [tile variant]]
-              ^{:key i} [:use {:x i :href (str "#tile-" tile variant)}])
-            tiles)]]
-         [:use {:href "#generator-row"}]]])
+           [:g
+            (map-indexed
+             (fn [i [tile variant]]
+               ^{:key i} [:use {:x i :href (str "#tile-" tile variant)}])
+             tiles)]]
+
+          (for [variant (range 4)]
+            ^{:key variant}
+            [:symbol
+             {:id (str "row-" variant)}
+             [:use {:href "#generator-row" :transform (row-transform variant)}]])]
+
+         (for [i (range 4)]
+           [:use {:href (str "#row-" i) :y (* (inc i) tile-height)}])]])
+
 
      [:section
       [:h2 "Entire board"]
