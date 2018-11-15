@@ -94,6 +94,19 @@
                                  (flatten)
                                  (str/join " "))}]])
 
+(defn ^:private transform
+  "Given an object's width, height, and a variant (given by a string 0, 1, 2, 3 as
+  defined elsewhere in the app), produce a SVG specification of said transform."
+  [width height variant]
+  (let [hw (/ width 2)
+        hh (/ height 2)
+        center (str "translate(-" hw ", -" hh ")")]
+    (case (str variant)
+      "0" nil
+      "1" (str "rotate(180, " hw ", " hh ")")
+      "2" (str center " scale(1, -1) translate(" hw ", " (- (- hh) height) ")" )
+      "3" (str center " scale(-1, 1) translate(" (- (- hw) width) ", " hh ")" ))))
+
 (defn canvas
   []
   (let [state @app-state
@@ -103,14 +116,7 @@
                     [:symbol
                      {:id (str "tile-" root variant)
                       :class "tile-root"
-                      :transform (let [hw (/ tile-width 2)
-                                       hh (/ tile-height 2)
-                                       center (str "translate(-" hw ", -" hh ")")]
-                                   (case variant
-                                     "0" nil
-                                     "1" (str "rotate(180, " hw ", " hh ")")
-                                     "2" (str center " scale(1, -1) translate(" hw ", " (- (- hh) tile-height) ")" )
-                                     "3" (str center " scale(-1, 1) translate(" (- (- hw) tile-width) ", " hh ")" )))}
+                      :transform (transform tile-width tile-height variant)}
                      [:g
                       [:rect {:class "tile-base" :id (str "tile-base-" root variant)
                               :width tile-width :height tile-height
