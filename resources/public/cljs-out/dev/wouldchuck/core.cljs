@@ -6,6 +6,8 @@
    [reagent.core :as r]
    [clojure.string :as str]))
 
+;; TODO: get rid of edges between rows; try: shape-rendering + epsilon
+
 (defonce app-state
   (r/atom
    {:tile/ratio 1.5
@@ -18,46 +20,102 @@
 
 (def hickory "#FFF8DC")
 (def walnut "#8B4513")
+
+(def variants (range 4))
+(def roots ["a" "b"])
+
 (def colors [hickory walnut])
 (def adjacent (zipmap colors (rest (cycle colors))))
 (defn darken
-  [hex-color]
-  (-> hex-color gcolor/hexToRgb (gcolor/darken 0.20) gcolor/rgbArrayToHex))
+  ([hex-color amount]
+   (-> hex-color gcolor/hexToRgb (gcolor/darken amount) gcolor/rgbArrayToHex))
+  ([hex-color]
+   (darken hex-color 0.25)))
+
+(def tile-width 1)
+(def gutter-width 0.5)
+(def eps-height 0.1) ;; to prevent ugly edges
+
+(def sqrt2 (Math/sqrt 2))
+(def sqrt3 (Math/sqrt 3))
+(def sqrt5 (Math/sqrt 5))
 
 (def editable-keys
   {:tile/ratio {::label "Ratio (height/width):"
                 ::presets {"1" 1
-                           "√2" (Math/sqrt 2)
-                           "√3" (Math/sqrt 3)
+                           "√2" sqrt2
+                           "√3" sqrt3
                            "2 (√4)" 2
-                           "√5" (Math/sqrt 5)}
+                           "√5" sqrt5}
                 ::coerce js/parseFloat}
    :tile/angle {::label "Angle (deg):"
                 ::presets {"30°" 30
                            "45°" 45
                            "60°" 60}
-                ::coerce js/parseFloat} ;; TODO: actually make coerce work
-   :rule/string {::label "Rule:"}})
+                ::coerce js/parseFloat}
+   :rule/string {::label "Rule:"
+                 ::presets {"Debug combo" "ab,0123,0123"
+                            "Hexagons" "abba,0033,03"}}
+   :layout/rows {::label "Rows:"
+                 ::coerce js/parseInt}
+   :layout/cols {::label "Cols:"
+                 ::coerce js/parseInt}})
 
 (defn ^:private parameter-form
   []
   (let [state @app-state]
     [:ul {:id "editable"}
      [:li "Tile width ≝ 1 unit"]
-     (for [[k {::keys [label presets]}] editable-keys]
+     (for [[k {::keys [label presets coerce] :or {coerce identity}}] editable-keys]
        [:li
         [:label label]
         [:input
          {:value (state k)
-          :on-change #(swap! app-state assoc k (-> % .-target .-value))}]
+          :on-change #(swap! app-state assoc k (-> % .-target .-value coerce))}]
         (when presets
           (into
            [:span {:class "presets"}
             (for [[preset v] presets]
               [:button {:on-click #(swap! app-state assoc k v)} preset])]))])]))
 
-(def tile-width 1)
-(def gutter-width 0.5)
+(def full-presets
+  [{:name "Hexagons"
+    :values {:rule/string "abba,0033,03"
+             :layout/cols 18
+             :layout/rows 8
+             :tile/angle 30
+             :tile/ratio sqrt2}}])
+
+(defn ^:private full-presets-form
+  []
+  [:div
+   [:span "Example presets: "]
+   (for [{:keys [name values]} full-presets]
+     ^{:key name}
+     [:button {:on-click #(swap! app-state merge values)} name])])
+
+(def highlight-filter
+  [:filter#highlight
+   [:feColorMatrix {:type "matrix"
+                    :values (->> [[0 0 0 0 0]
+                                  [0 1 0 0 0]
+                                  [0 0 1 0 0]
+                                  [0 0 0 1 0]]
+                                 (flatten)
+                                 (str/join " "))}]])
+
+(defn ^:private transform
+  "Given an object's width, height, and a variant (given by a string 0, 1, 2, 3 as
+  defined elsewhere in the app), produce a SVG specification of said transform."
+  [width height variant]
+  (let [hw (/ width 2)
+        hh (/ height 2)
+        center (str "translate(-" hw ", -" hh ")")]
+    (case (str variant)
+      "0" nil
+      "1" (str "rotate(180, " hw ", " hh ")")
+      "2" (str center " scale(1, -1) translate(" hw ", " (- (- hh) height) ")" )
+      "3" (str center " scale(-1, 1) translate(" (- (- hw) width) ", " hh ")" ))))
 
 (defn canvas
   []
@@ -67,34 +125,34 @@
         make-tile (fn [root variant base-color]
                     [:symbol
                      {:id (str "tile-" root variant)
-                      :transform (let [hw (/ tile-width 2)
-                                       hh (/ tile-height 2)
-                                       center (str "translate(-" hw ", -" hh ")")]
-                                   (case variant
-                                     "0" nil
-                                     "1" (str "rotate(180, " hw ", " hh ")")
-                                     "2" (str center " scale(-1, 1) translate(" (- (- hw) tile-width) ", " hh ")" )
-                                     "3" (str center " scale(1, -1) translate(" hw ", " (- (- hh) tile-height) ")" )
-                                     ))}
-                     [:rect {:class "tile-base" :id (str "tile-base-" root variant)
-                             :width tile-width :height tile-height
-                             :style {:fill base-color
-                                     :stroke (darken base-color)
-                                     :stroke-width "0.05"}}]
-                     (let [w tile-width
-                           t (-> state :tile/angle gmath/toRadians Math/tan)]
-                       [:polyline
-                        {:class (str "tile-notch-" root variant)
-                         :points (->> [[0 0] [w 0] [w (* w t)]]
-                                      (map (partial str/join ","))
-                                      (str/join " "))
-                         :style {:fill (adjacent base-color)
-                                 :clip-path "url(#tile-base-clip)"}}])])]
+                      :class "tile-root"
+                      :transform (transform tile-width tile-height variant)}
+                     [:g
+                      [:rect {:class "tile-base"
+                              :id (str "tile-base-" root variant)
+                              :width tile-width
+                              :height tile-height
+                              :style {:fill base-color
+                                      :stroke (darken base-color)
+                                      :stroke-width "0.05"}}]
+                      (let [w tile-width
+                            t (-> state :tile/angle gmath/toRadians Math/tan)]
+                        [:polyline
+                         {:class (str "tile-notch-" root variant)
+                          :points (->> [[0 0] [w 0] [w (* w t)]]
+                                       (map (partial str/join ","))
+                                       (str/join " "))
+                          :style {:fill (adjacent base-color)
+                                  :clip-path "url(#tile-base-clip)"}}])]])]
     [:div
      [:h2 "Base tiles and variants"]
      [:svg
-      (let [viewbox-width 15
-            viewbox-height (+ tile-height 1) ;; tile + room for the labels
+      (let [n-tiles (* (count roots) (count variants))
+            viewbox-width (+ (* tile-width n-tiles)
+                             (* gutter-width (dec n-tiles)))
+
+            label-height 1
+            viewbox-height (+ tile-height label-height)
             zoom-ratio 35]
         {:id "sample"
          :width (str (* zoom-ratio viewbox-width) "px")
@@ -106,101 +164,112 @@
 
       ;; Can't use clipPath inside the symbol definition, mysteriously breaks.
       [:defs
-       (make-tile "sample" "0" "#000")
+       highlight-filter
+
+       [make-tile "sample" "0" "#000"]
        [:clipPath {:id "tile-base-clip"}
         [:use {:href "#tile-base-sample0"}]]
        (for [root ["a" "b"]
              variant ["0" "1" "2" "3"]
              :let [color (case root
-                           "a" hickory
-                           "b" walnut)]]
-         (make-tile root variant color))]
+                           "a" walnut
+                           "b" hickory)]]
+         ^{:key [root variant color]} [make-tile root variant color])]
 
       (map-indexed
        (fn [i [root variant]]
          (let [x (* i (+ gutter-width tile-width))]
            [:g
             [:use {:href (str "#tile-" root variant) :x x :y 0}]
-            [:text {:x (+ x 0.5)
+            [:text {:x (+ x (/ tile-width 2))
                     :y (+ tile-height 0.2)
                     :style {:dominant-baseline "hanging" :text-anchor "middle" :font-size "0.5pt"}}
              (str root variant)]]))
        (for [root ["a" "b"] variant ["0" "1" "2" "3"]] [root variant]))]
 
-     [:h2 "Generator row"]
-     [:svg
-      (let [viewbox-width 15
-            viewbox-height 1
+     (let [cols (state :layout/cols)
+           viewbox-width (* cols tile-width)
+           viewbox-height (* 5 tile-height)  ;; generator row + 4 variants
+           zoom-ratio 35
+
+           [root h-rule] (-> state :rule/string (str/split ","))
+           tiles (->> (map vector (cycle root) (cycle h-rule)) (take cols))
+
+           row-transform (partial transform (* cols tile-width) tile-height)]
+       [:section
+        [:h2 "Row variants"]
+        [:svg
+         {:id "row-demo"
+          :width (str (* zoom-ratio viewbox-width) "px")
+          :height (str (* zoom-ratio viewbox-height) "px")
+          :view-box (str/join " " [0 0 viewbox-width viewbox-height])
+          :style {:display "block"}}
+
+         [:defs
+          [:symbol
+           {:id "generator-row"}
+           [:g
+            (map-indexed
+             (fn [i [tile variant]]
+               ^{:key i} [:use {:x i :href (str "#tile-" tile variant)}])
+             tiles)]]
+
+          (for [variant (range 4)]
+            ^{:key variant}
+            [:symbol
+             {:id (str "row-" variant)}
+             [:use {:href "#generator-row" :transform (row-transform variant)}]])]
+
+         (for [i (range 4)]
+           [:use {:href (str "#row-" i) :y (* (inc i) tile-height)}])]])
+
+
+     [:section
+      [:h2 "Entire board"]
+      (let [{:keys [layout/cols layout/rows]} state
+            viewbox-width (* cols tile-width)
+            viewbox-height (* rows tile-height)
             zoom-ratio 35]
-        {:id "root-tile"
-         :width (str (* zoom-ratio viewbox-width) "px")
-         :height (str (* zoom-ratio viewbox-height) "px")
-         :view-box (str/join " " [0 0 viewbox-width viewbox-height])
-         :style {:display "block"}})
-
-      (let [cols (state :layout/cols)
-            [root h-rule] (-> state :rule/string (str/split ","))]
-        (.log js/console (str "root: " root " h-rule: " h-rule))
-        [:defs
-         [:symbol
-          {:id "generator"}
-          (->> (map vector root h-rule)
-               (cycle)
-               (take cols)
-               (map-indexed
-                (fn [i [tile variant]]
-                  [:use {:x i :href (str "#tile-" tile variant)}])))]])
-      [:use {:href "#generator"}]]
-
-     [:h2 "Entire board"]
-     [:svg
-      {:width "500px" :height "600px" :style {:border "1px solid blue"} :view-box "0 0 20 20"}
-      [:use {:href "#tile-a0"}]
-      [:use {:href "#tile-a0" :transform "translate(2 2) rotate(45)"}]]]))
+        [:svg
+         {:width (str (* zoom-ratio viewbox-width) "px")
+          :height (str (* zoom-ratio viewbox-height) "px")
+          :view-box (str/join " " [0 0 viewbox-width viewbox-height])
+          :style {:display "block"}}
+         (let [[_ _ v-rule] (-> state :rule/string (str/split ","))
+               row-variants (->> (cycle v-rule) (take rows))]
+           (map-indexed
+            (fn [i row-variant]
+              ^{:key i}
+              [:use
+               {:href (str "#row-" row-variant)
+                :y (-> i (* tile-height) (- eps-height))}])
+            row-variants))])]]))
 
 (defn rule-splainer
   []
-                                        ; Explanation: The top row consists of h
-                                        ; rectangles of two types, either 0 or 1
-                                        ; as shown: Specify them in the
-                                        ; field "type". If "type" has less than
-                                        ; h digits, then it is wrapped around.
-                                        ; These rectangles depend on two tunable
-                                        ; parameters: ratio (height/width) and
-                                        ; angle (the angle of the top triangular
-                                        ; cutout) The h rectangles of the top
-                                        ; strip are transformed as specified
-                                        ; in "trans1". It is a sequence of up to
-                                        ; h digits; if less than h digits are
-                                        ; specified then the transformations are
-                                        ; wrapped around. Each digit is either
-                                        ; 0 (original orientation), 1 (180
-                                        ; rotation), 2 (vertical flip) or
-                                        ; 3 (horizontal flip).
-                                        ; After the top row is built, v copies of it are made and stacked below. Each of the v copies is transformed as specified by "trans2" in the same way as "trans1". Turn on the border to see individual triangles.
-
   (let [rule (@app-state :rule/string)
         [root-tile h-rule v-rule] (str/split rule ",")]
     [:div
      [:p "The rule above consists of several parts separated by commas:"]
      [:ol
-      [:li "Root tile, here: " [:b root-tile]]
+      [:li "Base pattern, here: " [:b root-tile]]
       [:li "Horizontal production rule, here: " [:b h-rule]]
       [:li "Vertical production rule, here: " [:b v-rule]]]
-     [:p "The horizontal role determines how the first row is created, the vertical rule defines how the first row is copied. Both parts consist of digits from 0 to 3 inclusive. These digits mean:"]
+     [:p "The horizontal role determines how the first row is created, the vertical rule defines how the first row is copied to produce the following rows. Both parts consist of digits from 0 to 3 inclusive. These digits mean:"]
      [:ul
       [:li "0: no change"]
       [:li "1: 180° rotation"]
-      [:li "2: vertical flip"]
-      [:li "3: horizontal flip"]]
-     ])
-  )
+      [:li "2: vertical flip ↕"]
+      [:li "3: horizontal flip ↔"]]]))
 
 (defn main
   []
   [:div
    [:img {:src "/img/woodchuck.svg" :style {:float :right}}]
+
    [parameter-form]
+   [full-presets-form]
+
    [rule-splainer]
    [canvas]])
 

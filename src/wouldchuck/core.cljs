@@ -6,6 +6,8 @@
    [reagent.core :as r]
    [clojure.string :as str]))
 
+;; TODO: get rid of edges between rows; try: shape-rendering + epsilon
+
 (defonce app-state
   (r/atom
    {:tile/ratio 1.5
@@ -29,6 +31,10 @@
    (-> hex-color gcolor/hexToRgb (gcolor/darken amount) gcolor/rgbArrayToHex))
   ([hex-color]
    (darken hex-color 0.25)))
+
+(def tile-width 1)
+(def gutter-width 0.5)
+(def eps-height 0.1) ;; to prevent ugly edges
 
 (def sqrt2 (Math/sqrt 2))
 (def sqrt3 (Math/sqrt 3))
@@ -88,9 +94,6 @@
      ^{:key name}
      [:button {:on-click #(swap! app-state merge values)} name])])
 
-(def tile-width 1)
-(def gutter-width 0.5)
-
 (def highlight-filter
   [:filter#highlight
    [:feColorMatrix {:type "matrix"
@@ -125,8 +128,10 @@
                       :class "tile-root"
                       :transform (transform tile-width tile-height variant)}
                      [:g
-                      [:rect {:class "tile-base" :id (str "tile-base-" root variant)
-                              :width tile-width :height tile-height
+                      [:rect {:class "tile-base"
+                              :id (str "tile-base-" root variant)
+                              :width tile-width
+                              :height tile-height
                               :style {:fill base-color
                                       :stroke (darken base-color)
                                       :stroke-width "0.05"}}]
@@ -237,7 +242,7 @@
               ^{:key i}
               [:use
                {:href (str "#row-" row-variant)
-                :y (* i tile-height)}])
+                :y (-> i (* tile-height) (- eps-height))}])
             row-variants))])]]))
 
 (defn rule-splainer
